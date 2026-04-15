@@ -1,2 +1,5 @@
 ./agents/
 .DS_Store
+.specstory/
+.vscode/
+skills/newegg-pc-builder/.specstory/
