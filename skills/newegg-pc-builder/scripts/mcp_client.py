@@ -9,10 +9,16 @@ which tool to use and how to fill parameters based on list_tools output.
 Usage:
     python mcp_client.py list_tools
     python mcp_client.py call <tool_name> '<json_arguments>'
+    python mcp_client.py call <tool_name> @args.json
+    echo '{"question":"..."}' | python mcp_client.py call <tool_name> -
+
+On Windows PowerShell, prefer single-quoted JSON (see skill doc) or @file / stdin
+to avoid broken escaping with double quotes.
 """
 
 import sys
 import json
+import os
 import urllib.request
 import urllib.error
 import uuid
@@ -130,6 +136,7 @@ def cmd_list_tools():
     print("2. Build a JSON object using only parameters listed above.")
     print("3. For free-text parameters (question/query/text), put the user's intent as natural language.")
     print("4. Call: python scripts/mcp_client.py call <tool_name> '<json_args>'")
+    print("   Windows: use single quotes, or @args.json / stdin '-' — see script docstring.")
 
 
 def cmd_call_tool(tool_name: str, arguments: dict):
@@ -175,7 +182,21 @@ def cmd_call_tool(tool_name: str, arguments: dict):
     print("- Otherwise, extract build/compatibility/component info and present it clearly.")
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+def _load_call_arguments_raw(spec: str) -> str:
+    """
+    Resolve the third argument to call: inline JSON, '-' for stdin, or @path for a file.
+    """
+    if spec == "-":
+        return sys.stdin.read()
+    if spec.startswith("@"):
+        path = spec[1:]
+        if not path:
+            raise ValueError("Empty path after @; use @C:\\path\\args.json or @args.json")
+        path = os.path.expanduser(path)
+        with open(path, encoding="utf-8-sig") as f:
+            return f.read()
+    return spec
+
 
 def main():
     if len(sys.argv) < 2:
@@ -189,14 +210,37 @@ def main():
 
     elif command == "call":
         if len(sys.argv) < 3:
-            print("Usage: mcp_client.py call <tool_name> [json_arguments]")
+            print(
+                "Usage: mcp_client.py call <tool_name> [json|@file|-]\n"
+                "  json     Inline JSON object (use single quotes on PowerShell).\n"
+                "  @path    Read JSON from a UTF-8 file (recommended on Windows).\n"
+                "  -        Read JSON from stdin (e.g. pipe or redirect).",
+                file=sys.stderr,
+            )
             sys.exit(1)
         tool_name = sys.argv[2]
-        raw_args = sys.argv[3] if len(sys.argv) > 3 else "{}"
+        raw_args = ""
         try:
+            if len(sys.argv) > 3:
+                raw_args = _load_call_arguments_raw(sys.argv[3])
+            else:
+                raw_args = "{}"
             arguments = json.loads(raw_args)
-        except json.JSONDecodeError as e:
-            print(f"ERROR: arguments must be valid JSON.\n  Got: {raw_args}\n  {e}", file=sys.stderr)
+        except (json.JSONDecodeError, OSError, ValueError) as e:
+            preview = raw_args if isinstance(raw_args, str) else ""
+            if len(preview) > 120:
+                preview = preview[:120] + "..."
+            print(
+                f"ERROR: arguments must be valid JSON.\n  Got: {preview!r}\n  {e}",
+                file=sys.stderr,
+            )
+            print(
+                "Hint (PowerShell): use single quotes around JSON, e.g.\n"
+                "  python mcp_client.py call v2allin '{\"question\": \"your text\"}'\n"
+                "Or put JSON in a file and run:\n"
+                "  python mcp_client.py call v2allin @args.json",
+                file=sys.stderr,
+            )
             sys.exit(1)
         cmd_call_tool(tool_name, arguments)
 

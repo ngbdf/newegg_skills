@@ -70,6 +70,34 @@ Tool name and arguments are determined at runtime from Step 2. Example:
 python scripts/mcp_client.py call v2allin '{"question": "gaming PC RTX 5090 9800X3D best price"}'
 ```
 
+**Windows PowerShell (important)**  
+PowerShell parses **outer double quotes** before Python runs. Using `\"...\"` inside `"..."` often **breaks** the JSON string (you may see errors like `Got: {\` or “invalid JSON”). Prefer one of:
+
+1. **Single-quote the whole JSON** (no backslash escapes needed):
+
+   ```powershell
+   python scripts/mcp_client.py call v2allin '{"question": "gaming PC RTX 3070"}'
+   ```
+
+2. **JSON in a file** (most reliable for long or nested payloads):
+
+   ```powershell
+   Set-Content -Path args.json -Encoding utf8 '{"question": "gaming PC RTX 3070"}'
+   python scripts/mcp_client.py call v2allin @args.json
+   ```
+
+3. **Stdin** (pipe or redirect):
+
+   ```powershell
+   '{"question": "gaming PC RTX 3070"}' | python scripts/mcp_client.py call v2allin -
+   ```
+
+The script supports `@path\to\file.json` and `-` for stdin so shells never need to escape inner double quotes.
+
+**Where to change things**  
+- **Skill + script** (recommended): keep examples and `mcp_client.py` in sync — document PowerShell rules here, and use `@file` / `-` in the client to avoid quoting bugs.  
+- **Repo-only docs** do not fix agents that load this skill from `~/.agents`; updating the **skill** is the right place for portable behavior.
+
 ### Step 4 — Interpret the response
 
 Parse the JSON output. Common response shapes:
@@ -118,6 +146,12 @@ python scripts/mcp_client.py list_tools
 
 python scripts/mcp_client.py call <tool_name> '<json_args>'
     → calls the tool and prints the JSON response
+
+python scripts/mcp_client.py call <tool_name> @args.json
+    → reads JSON arguments from a UTF-8 file (good on Windows)
+
+echo '<json>' | python scripts/mcp_client.py call <tool_name> -
+    → reads JSON from stdin
 ```
 
-Errors go to stderr with a non-zero exit code.
+Errors go to stderr with a non-zero exit code. Invalid JSON prints a short hint for PowerShell users.
