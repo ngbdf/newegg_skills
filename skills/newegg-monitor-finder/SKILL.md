@@ -54,7 +54,10 @@ python scripts/monitor_api.py "curved ultrawide gaming monitor" --min-price 350 
 ```
 
 - The query is one quoted positional argument; everything else is an option:
-  `--min-price`, `--max-price`, `--order`, `--page`, `--limit N` (default 30), `--raw`, `--timeout N`.
+  `--min-price`, `--max-price`, `--order`, `--page`, `--limit N` (default 30), `--raw`, `--timeout N`,
+  `--utm-source S` (default `"claude"` — tags every `Url` field with UTM parameters; see
+  [`references/product_link_rules.md`](./references/product_link_rules.md) for how to determine
+  the right value before calling the script).
 - `scripts/` is relative to **this skill's own directory** — run it from there, or pass the absolute path.
 - Exit codes: `0` ok, `1` usage error, `2` transport/API error (message on stderr).
 - **Always use the slim output.** A raw page is ~110 KB and will flood context; slimmed it is ~21 KB.
@@ -271,7 +274,7 @@ output** — treat a missing key as unknown rather than erroring or guessing.
 
 | Field | Notes |
 |---|---|
-| `ItemNumber` / `Url` | `Url` is the ready-made `https://www.newegg.com/p/{ItemNumber}` link |
+| `ItemNumber` / `Url` | `Url` is the ready-made link, **already UTM-tagged by the script** (`--utm-source`, per `references/product_link_rules.md`) — use it exactly as returned, never rebuild `https://www.newegg.com/p/{ItemNumber}` from `ItemNumber` yourself and drop the tagging |
 | `Title` | Product title (link text) |
 | `FinalPrice` | Numeric price — format as `$X.XX` |
 | `PriceSaveText` | Savings text, if any |
@@ -305,15 +308,17 @@ Take the **top 10** after filtering.
 
 | # | Monitor | Size | Resolution | Refresh | Panel | Price | Rating |
 |---|---------|------|------------|---------|-------|-------|--------|
-| 1 | [Product Name](https://www.newegg.com/p/ITEM_NUMBER) | 27" | 1440p | 165Hz | IPS | $XXX | ⭐ X.X |
+| 1 | [Product Name](https://www.newegg.com/p/ITEM_NUMBER?Item=ITEM_NUMBER&utm_source={platform}&utm_medium=ai_skill&utm_campaign=monitor-finder&utm_content=newegg-monitor-finder) | 27" | 1440p | 165Hz | IPS | $XXX | ⭐ X.X |
 ...
 
 💡 **Click any monitor name to view full specs and buy on Newegg.**
 
-🔗 [See more gaming monitors on Newegg →](https://www.newegg.com/Gaming-Monitors/SubCategory/ID-3577?d=QUERY)
+🔗 [See more gaming monitors on Newegg →](https://www.newegg.com/Gaming-Monitors/SubCategory/ID-3577?d=QUERY&utm_source={platform}&utm_medium=ai_skill&utm_campaign=monitor-finder&utm_content=newegg-monitor-finder)
 ```
 
 **Formatting rules:**
+- Link each product name to its `Url` field exactly as returned (already UTM-tagged) — never
+  the bare `https://www.newegg.com/p/{ItemNumber}` shown as a shortened example above.
 - Format `FinalPrice` as `$X` (no decimals if `.00`) or `$X.XX`
 - If `PriceSaveText` non-empty: add `> 💸 Save PriceSaveText` below the row
 - If `IsRefurbished`: append ` 🔄` to product name

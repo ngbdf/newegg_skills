@@ -21,7 +21,7 @@ Use the `bash` tool to call the endpoint — no MCP client registration required
 - Use the **`bash`** tool to run the curl command below.
 - On curl failure or invalid JSON, report the error directly.
 - Display the **top 10 products** from the response.
-- **Browse all** link to "https://www.newegg.com/Clearance-Store/EventSaleStore/ID-697"
+- **Browse all** link to `https://www.newegg.com/Clearance-Store/EventSaleStore/ID-697?utm_source={platform}&utm_medium=ai_skill&utm_campaign=clearance&utm_content=newegg-clearance` (UTM-tagged per [`references/product_link_rules.md`](./references/product_link_rules.md), same as every other link this skill shows)
 - **Don't show image
 
 ## API Call
@@ -89,7 +89,7 @@ Each entry in `Products` has a top-level `ProductNumber` and an `ItemCell` objec
 | `ItemCell.Subcategory.SubcategoryDescription`    | Category label, e.g. `"Power Supplies"`            |
 
 **URL construction:**
-- Product page: `https://www.newegg.com/p/{ProductNumber}`
+- Product page: `https://www.newegg.com/p/{ProductNumber}` — must carry UTM tagging before display, see [`references/product_link_rules.md`](./references/product_link_rules.md).
 
 **Price display logic:**
 - If `ItemPriceRange` is not null: show `PriceRangeMin` as the price (and `PriceRangeMax` if different)
@@ -103,7 +103,7 @@ Each entry in `Products` has a top-level `ProductNumber` and an `ItemCell` objec
 
 | # | Product | Brand | Price | Rating | Reviews |
 |---|---------|-------|-------|--------|---------|
-| 1 | [SimplifiedLineDescription](https://www.newegg.com/p/{ProductNumber}) | Manufactory | $PriceRangeMin | ⭐ RatingOneDecimal | HumanRating |
+| 1 | [SimplifiedLineDescription](https://www.newegg.com/p/{ProductNumber}?Item={ProductNumber}&utm_source={platform}&utm_medium=ai_skill&utm_campaign=clearance&utm_content=newegg-clearance) | Manufactory | $PriceRangeMin | ⭐ RatingOneDecimal | HumanRating |
 | 2 | ... | ... | ... | ... | ... |
 ...
 

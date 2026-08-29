@@ -23,6 +23,10 @@ Spec JSON fields (all optional except at least one component):
                   (default none)
     skip_product_search - bool, set true to skip the live PSU product lookup
                   (recommended_products stays empty; shop_url is still returned)
+    utm_source  - calling platform for Newegg link tagging, e.g. "claude" (default),
+                  "cursor", "unknown_agent" -- see build_item_url() below and
+                  newegg-pc-builder-v2's reference/product_link_rules.md for how
+                  this is determined. Never hardcode a guess.
 
 Example:
     python calculate_psu.py '{"cpu":"Ryzen 7 9800X3D","gpu":"RTX 5080","mb":"ATX","ram":"32GB DDR5","ram_count":2,"ssd":"1TB+"}'
@@ -36,6 +40,34 @@ import re
 import sys
 import urllib.request
 from difflib import SequenceMatcher
+
+# --- Newegg link tagging (UTM) --------------------------------------------
+# Same convention as newegg-pc-builder-v2's reference/product_link_rules.md.
+# utm_source is the calling platform, resolved by the agent per
+# environment_detection.md (Claude-exclusive tool present -> "claude", a
+# Cursor project signature -> "cursor", etc.; "unknown_agent" if undetermined)
+# and passed in via the JSON spec's "utm_source" key -- never hardcode a guess.
+UTM_CAMPAIGN = "psu-calculator"
+UTM_CONTENT = "newegg-psu-calculator"
+
+
+def build_item_url(item_number, utm_source):
+    """Tagged Newegg product-page link for a single item number."""
+    return (
+        f"https://www.newegg.com/p/{item_number}?Item={item_number}"
+        f"&utm_source={utm_source}&utm_medium=ai_skill"
+        f"&utm_campaign={UTM_CAMPAIGN}&utm_content={UTM_CONTENT}"
+    )
+
+
+def build_shop_url(recommended, utm_source):
+    """Tagged Newegg category-search fallback link (no single Item=)."""
+    return (
+        f"https://www.newegg.com/p/pl?d={recommended}W+PSU+modular+gold"
+        f"&utm_source={utm_source}&utm_medium=ai_skill"
+        f"&utm_campaign={UTM_CAMPAIGN}&utm_content={UTM_CONTENT}"
+    )
+
 
 # Stage-4 GPU guess must beat this; equality is rejected (T400 vs "我没有 4090" == 0.50).
 GPU_FUZZY_MIN_SIMILARITY = 0.5
@@ -207,7 +239,7 @@ def fetch_api(tool):
 PSU_SEARCH_MAX_PAGES = 3
 
 
-def fetch_psu_products(wattage_tier):
+def fetch_psu_products(wattage_tier, utm_source="claude"):
     """Look up 1-2 real 80+ Gold-or-better PSUs at the recommended wattage tier.
 
     Best-effort only: any failure (network, parsing, no Gold+ match after
@@ -269,7 +301,7 @@ def fetch_psu_products(wattage_tier):
                 "item_number": item_number,
                 "price": price,
                 "currency": currency,
-                "link": f"https://www.newegg.com/p/{item_number}",
+                "link": build_item_url(item_number, utm_source),
             })
             if len(picks) >= MAX_RECOMMENDED_PRODUCTS:
                 return picks
@@ -556,6 +588,9 @@ def build_recommendation_note(total_watts, headroom_watts, recommended, floor_ap
 # ──────────────────────────────────────────────
 
 def _run(spec):
+    # Calling platform for link tagging -- see build_item_url/build_shop_url above.
+    # Passed by the agent in the JSON spec; defaults to "claude" if omitted.
+    utm_source = spec.get("utm_source", "claude")
     result = {
         "components": [],
         "total_watts": 0.0,
@@ -730,13 +765,11 @@ def _run(spec):
     result["recommendation_note"] = build_recommendation_note(
         total, headroom, recommended, floor_applied
     )
-    result["shop_url"] = (
-        f"https://www.newegg.com/p/pl?d={recommended}W+PSU+modular+gold"
-    )
+    result["shop_url"] = build_shop_url(recommended, utm_source)
 
     if not spec.get("skip_product_search"):
         try:
-            result["recommended_products"] = fetch_psu_products(recommended)
+            result["recommended_products"] = fetch_psu_products(recommended, utm_source)
         except Exception:
             # Never let the product-lookup enhancement break the core calculation.
             result["recommended_products"] = []

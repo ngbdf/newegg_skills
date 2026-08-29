@@ -77,6 +77,8 @@ https://www.newegg.com/p/{Item}
 ```
 例如：`https://www.newegg.com/p/32-508-055`
 
+展示前必须打上 UTM 标记，见 [`references/product_link_rules.md`](./references/product_link_rules.md)。
+
 ## Execution Flow
 
 1. Call the API with **`bash`** using the curl command in **Agent execution rules** (no other tool for the HTTP request).
@@ -93,7 +95,7 @@ Return a clear product table containing:
 
 | Item Number | Product Name | Original Price | Flash Deal Price | Image |
 |---------|---------|------|-------|------|
-| 32-508-055 | [adidas $50 Gift Card](https://www.newegg.com/p/32-508-055) | $50 | $50 | [Image](https://c1.neweggimages.com/ProductImageCompressAll/32-508-055-V01.jpg) |
+| 32-508-055 | [adidas $50 Gift Card](https://www.newegg.com/p/32-508-055?Item=32-508-055&utm_source={platform}&utm_medium=ai_skill&utm_campaign=shell-shocker&utm_content=newegg-shell-shocker) | $50 | $50 | [Image](https://c1.neweggimages.com/ProductImageCompressAll/32-508-055-V01.jpg) |
 | ... | ... | ... | ... | ... |
 
 ## Tomorrow's Flash Deals (TomorrowItems)

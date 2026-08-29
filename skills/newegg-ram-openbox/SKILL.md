@@ -200,6 +200,8 @@ like a shopping assistant talking to a customer, not like a report on the search
 |---|---|
 | "The other 5 2x32GB kits that matched this search were all Corsair — no other brand available" | "Right now the 2x32GB kit matching your preference is the G.SKILL Ripjaws V; if you're open to DDR5 or single-stick pairs, I can also check Kingston, Crucial, and other brands" |
 
+Every product link must carry UTM tagging before display, see [`references/product_link_rules.md`](./references/product_link_rules.md).
+
 ## Response Format
 
 ```
@@ -207,7 +209,7 @@ like a shopping assistant talking to a customer, not like a report on the search
 
 | # | Product | Price | Rating | Reviews | Status |
 |---|---|---|---|---|---|
-| 1 | [WebDescription](https://www.newegg.com/p/{ItemNumber}) | $147.42 | ⭐4.4 | 850 | 🔄 Refurbished |
+| 1 | [WebDescription](https://www.newegg.com/p/{ItemNumber}?Item={ItemNumber}&utm_source={platform}&utm_medium=ai_skill&utm_campaign=ram-openbox&utm_content=newegg-ram-openbox) | $147.42 | ⭐4.4 | 850 | 🔄 Refurbished |
 | 2 | ... | ... | ... | ... | ... |
 
 💡 Combines semantic relevance + price sorting

@@ -230,6 +230,8 @@ Map all selections to the JSON spec format and run:
 python3 <skill_base_dir>/scripts/calculate_psu.py '<json_spec>'
 ```
 
+The script tags every Newegg link it returns (`link` / `shop_url`) with UTM parameters using the JSON spec's optional `"utm_source"` key (defaults to `"claude"` if omitted) — see [`references/product_link_rules.md`](./references/product_link_rules.md) for how to determine the right value before calling the script.
+
 **Mapping guide:**
 
 | Selection | JSON field | Value |

@@ -44,10 +44,19 @@ pc-builder.
 **Newegg product link format**: every item number resolves to a working product page at
 `https://www.newegg.com/p/<ItemNumber>` (short-hyphenated form, e.g.
 `https://www.newegg.com/p/19-113-884` — this redirects to the canonical product URL and always
-works). **Attach this link whenever you display an item in the response, as a markdown hyperlink
-on the item's name** — `[<name> (<item number>)](https://www.newegg.com/p/<item number>)` — for
-every checked part and every replacement part you propose. Never show the raw URL as its own
-table column or its own line next to the name; that's redundant.
+works). Every link you actually show the user must be the **full UTM-tagged form** per
+[`references/product_link_rules.md`](./references/product_link_rules.md) (the same convention
+`newegg-pc-builder-v2` uses) — never the bare `/p/<ItemNumber>` form. **Attach it whenever you
+display an item in the response, as a markdown hyperlink on the item's name**:
+
+```
+[<name> (<item number>)](https://www.newegg.com/p/<item number>?Item=<item number>&utm_source={platform}&utm_medium=ai_skill&utm_campaign=pc-compatibility-checker&utm_content=newegg-pc-compatibility-checker)
+```
+
+for every checked part and every replacement part you propose. Never show the raw URL as its own
+table column or its own line next to the name; that's redundant. Every worked example in this
+file (Response format below included) already shows the tagged form — copy that shape, not a
+shortened one, even though the query string makes it visually longer.
 
 **Price**: product-search results include a `Price.FinalPrice` (numeric) and `Price.CurrencyCode`
 field on each product. Whenever you already have a product-search result for an item — which you
@@ -170,7 +179,7 @@ Fields on the verdict object:
 ### Step 3 — Report the verdict honestly
 
 **If `isCompatible: true`:** Say so plainly, list what was checked — each item with its Newegg
-link (`https://www.newegg.com/p/<ItemNumber>`) — and stop. Do not invent caveats from your own
+link (`https://www.newegg.com/p/<ItemNumber>`, UTM-tagged per `references/product_link_rules.md`) — and stop. Do not invent caveats from your own
 knowledge beyond the PSU exception below.
 
 **Exception — PSU wattage disclosure.** pc-builder's rules cover sockets, chipsets, memory type,
@@ -233,7 +242,7 @@ updated item list to verify. Do not declare the fix valid from your own reasonin
 pc-builder. Iterate until `isCompatible: true` or the user changes scope.
 
 **Every replacement part you propose must include its Newegg product link**
-(`https://www.newegg.com/p/<ItemNumber>`) so the user can go buy it directly — a fix suggestion
+(`https://www.newegg.com/p/<ItemNumber>`, UTM-tagged per `references/product_link_rules.md`) so the user can go buy it directly — a fix suggestion
 with no link makes the user do a manual search for something you already found.
 
 ## Response format
@@ -253,8 +262,8 @@ non-English-speaking user.
 
 | Part | Model / Item # | Price |
 | --- | --- | --- |
-| <category> | [<user's name for item 1> (<item number>)](https://www.newegg.com/p/<item number>) | $<price> |
-| <category> | [<user's name for item 2> (<item number>)](https://www.newegg.com/p/<item number>) | $<price> |
+| <category> | [<user's name for item 1> (<item number>)](https://www.newegg.com/p/<item number>?Item=<item number>&utm_source={platform}&utm_medium=ai_skill&utm_campaign=pc-compatibility-checker&utm_content=newegg-pc-compatibility-checker) | $<price> |
+| <category> | [<user's name for item 2> (<item number>)](https://www.newegg.com/p/<item number>?Item=<item number>&utm_source={platform}&utm_medium=ai_skill&utm_campaign=pc-compatibility-checker&utm_content=newegg-pc-compatibility-checker) | $<price> |
 
 All parts are compatible according to Newegg PC Compatibility Checker.
 
@@ -267,7 +276,7 @@ newegg-psu-calculator-backed verdict with both wattages, or the official calcula
 ```
 ## Compatibility check: ❌ Incompatible
 
-**Conflict 1: [<name1> (<item1>)](https://www.newegg.com/p/<item1>) ↔ [<name2> (<item2>)](https://www.newegg.com/p/<item2>)**
+**Conflict 1: [<name1> (<item1>)](https://www.newegg.com/p/<item1>?Item=<item1>&utm_source={platform}&utm_medium=ai_skill&utm_campaign=pc-compatibility-checker&utm_content=newegg-pc-compatibility-checker) ↔ [<name2> (<item2>)](https://www.newegg.com/p/<item2>?Item=<item2>&utm_source={platform}&utm_medium=ai_skill&utm_campaign=pc-compatibility-checker&utm_content=newegg-pc-compatibility-checker)**
 - <reasonTraces[0] translated> (original: <reasonTraces[0]>)
 - <reasonTraces[1] translated> (original: <reasonTraces[1]>)
 
@@ -276,7 +285,7 @@ newegg-psu-calculator-backed verdict with both wattages, or the official calcula
 ### Suggested fix
 | Conflict | Replacement | Price |
 | --- | --- | --- |
-| Conflict 1 | [<specific replacement part name> (<item number>)](https://www.newegg.com/p/<item number>) | $<price> |
+| Conflict 1 | [<specific replacement part name> (<item number>)](https://www.newegg.com/p/<item number>?Item=<item number>&utm_source={platform}&utm_medium=ai_skill&utm_campaign=pc-compatibility-checker&utm_content=newegg-pc-compatibility-checker) | $<price> |
 
 ### Re-verification
 [call pc-builder again with the replacement → report new isCompatible]
@@ -284,10 +293,12 @@ newegg-psu-calculator-backed verdict with both wattages, or the official calcula
 
 ## Hard rules
 
-* **Attach a Newegg product link to every item you display, as a hyperlink on its name** —
-  `[<name> (<item number>)](https://www.newegg.com/p/<ItemNumber>)` (short-hyphenated form) —
-  whether it's a part the user asked about or a replacement you're suggesting. Never put the raw
-  URL in its own table column or its own line; that's redundant next to a named hyperlink.
+* **Attach a Newegg product link to every item you display, as a hyperlink on its name, always
+  UTM-tagged** per [`references/product_link_rules.md`](./references/product_link_rules.md) —
+  `[<name> (<item number>)](https://www.newegg.com/p/<ItemNumber>?Item=<ItemNumber>&utm_source={platform}&utm_medium=ai_skill&utm_campaign=pc-compatibility-checker&utm_content=newegg-pc-compatibility-checker)`
+  — never the bare `/p/<ItemNumber>` link with no query string. Applies whether it's a part the
+  user asked about or a replacement you're suggesting. Never put the raw URL in its own table
+  column or its own line; that's redundant next to a named hyperlink.
 * **Show each item's price** (from `Price.FinalPrice` / `Price.CurrencyCode` on the product-search
   result you already fetched for the link/verification step) in its own table column. Never
   invent or estimate a price — leave the cell blank if you genuinely don't have one.

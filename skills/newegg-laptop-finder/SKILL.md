@@ -143,7 +143,7 @@ Take the **first 10 items** from `products`.
 
 | Field | Notes |
 |-------|-------|
-| `ItemNumber` | Build URL: `https://www.newegg.com/p/{ItemNumber}` |
+| `ItemNumber` | Build URL: `https://www.newegg.com/p/{ItemNumber}` — tag with UTM params before display, see [`references/product_link_rules.md`](./references/product_link_rules.md) |
 | `WebDescription` | Product title (use as link text) |
 | `Price.FinalPrice` | **Numeric price** — format as `$X.XX`. (CurrentPriceText is often empty) |
 | `Price.OriginalPriceText` | Original price before discount (may be empty) |
@@ -164,14 +164,14 @@ link** so the user can go directly to Newegg to view specs and purchase.
 
 | # | Laptop | Price | Rating | Reviews |
 |---|--------|-------|--------|---------|
-| 1 | [Product Name](https://www.newegg.com/p/ITEM_NUMBER) | $XXX | ⭐ X.X | NNN |
-| 2 | [Product Name](https://www.newegg.com/p/ITEM_NUMBER) | $XXX | ⭐ X.X | NNN |
+| 1 | [Product Name](https://www.newegg.com/p/ITEM_NUMBER?Item=ITEM_NUMBER&utm_source={platform}&utm_medium=ai_skill&utm_campaign=laptop-finder&utm_content=newegg-laptop-finder) | $XXX | ⭐ X.X | NNN |
+| 2 | [Product Name](https://www.newegg.com/p/ITEM_NUMBER?Item=ITEM_NUMBER&utm_source={platform}&utm_medium=ai_skill&utm_campaign=laptop-finder&utm_content=newegg-laptop-finder) | $XXX | ⭐ X.X | NNN |
 ...
 | 10 | ... | ... | ... | ... |
 
 💡 **Click any laptop name to view full specs and buy on Newegg.**
 
-🔗 [See more laptops on Newegg →](https://www.newegg.com/Laptops-Notebooks/SubCategory/ID-32?d=QUERY)
+🔗 [See more laptops on Newegg →](https://www.newegg.com/Laptops-Notebooks/SubCategory/ID-32?d=QUERY&utm_source={platform}&utm_medium=ai_skill&utm_campaign=laptop-finder&utm_content=newegg-laptop-finder)
 ```
 
 **Formatting rules:**

@@ -17,6 +17,7 @@ Options:
     --country XX   CountryCode (default USA)
     --company N    CompanyCode (default 1003)
     --timeout N    seconds (default 30)
+    --utm-source S calling platform for Newegg product-link tagging (default "claude")
 
 Exit codes: 0 ok, 1 usage error, 2 transport/API error.
 """
@@ -29,6 +30,27 @@ import urllib.request
 ENDPOINT = "https://apis.newegg.com/ex-mcp/endpoint/gaming-pc-finder"
 # Identifies the calling skill to the endpoint; sent on every request.
 SKILL_NAME = "newegg-gaming-pc-finder"
+
+# --- Newegg link tagging (UTM) --------------------------------------------
+# Same convention as newegg-pc-builder-v2's reference/product_link_rules.md.
+# utm_source is the calling platform, resolved by the agent per
+# environment_detection.md (Claude-exclusive tool present -> "claude", a
+# Cursor project signature -> "cursor", etc.; "unknown_agent" if undetermined)
+# and passed in via --utm-source -- never hardcode a guess. This tags only the
+# per-system product links; the separate Gaming PC Finder tool-page link uses
+# its own cm_sp marker (see SKILL.md) and is untouched by this helper.
+UTM_CAMPAIGN = "gaming-pc-finder"
+UTM_CONTENT = "newegg-gaming-pc-finder"
+
+
+def build_item_url(item_number, utm_source):
+    """Tagged Newegg product-page link for a single item number."""
+    return (
+        f"https://www.newegg.com/p/{item_number}?Item={item_number}"
+        f"&utm_source={utm_source}&utm_medium=ai_skill"
+        f"&utm_campaign={UTM_CAMPAIGN}&utm_content={UTM_CONTENT}"
+    )
+
 
 METHODS = {
     "game_list": "getapi_adapter_Pgg_game_list",
@@ -95,14 +117,14 @@ def fps_of(item):
     return item.get("Fps")
 
 
-def slim_item(item):
+def slim_item(item, utm_source="claude"):
     desc = item.get("Description") or {}
     review = item.get("Review") or {}
     feature = item.get("Feature") or {}
     number = item.get("Item")
     return {
         "Item": number,
-        "Url": f"https://www.newegg.com/p/{number}" if number else None,
+        "Url": build_item_url(number, utm_source) if number else None,
         "Title": desc.get("Title") or desc.get("WebDescription"),
         "FinalPrice": item.get("FinalPrice"),
         "Cpu": item.get("Cpu"),
@@ -126,7 +148,7 @@ def names(bucket):
     return [b.get("Name") for b in (bucket or [])]
 
 
-def slim(tool, data, limit):
+def slim(tool, data, limit, utm_source="claude"):
     if tool == "game_list":
         return {
             "Games": [{"N": g["N"], "Name": g["Name"]} for g in data.get("GameInfos") or []],
@@ -143,7 +165,7 @@ def slim(tool, data, limit):
             ],
         }
     items = data.get("RecommendItems") if tool == "product_recommend" else data.get("Items")
-    out = {"Items": [slim_item(i) for i in (items or [])[:limit]]}
+    out = {"Items": [slim_item(i, utm_source) for i in (items or [])[:limit]]}
     if data.get("NumberOfItems") is not None:
         out["NumberOfItems"] = data["NumberOfItems"]
         out["Shown"] = len(out["Items"])
@@ -171,6 +193,7 @@ def main(argv):
 
     raw = False
     limit = 20
+    utm_source = "claude"
     arguments = {"CountryCode": "USA", "CompanyCode": 1003}
 
     rest = argv[1:]
@@ -191,6 +214,9 @@ def main(argv):
         elif token == "--timeout":
             index += 1
             arguments["__timeout"] = int(rest[index])
+        elif token == "--utm-source":
+            index += 1
+            utm_source = rest[index]
         elif "=" in token:
             key, _, value = token.partition("=")
             arguments[key] = int(value) if key in INT_ARGS else value
@@ -200,7 +226,7 @@ def main(argv):
 
     timeout = arguments.pop("__timeout", 30)
     data = call(tool, arguments, timeout)
-    view = data if raw else slim(tool, data, limit)
+    view = data if raw else slim(tool, data, limit, utm_source)
     print(json.dumps(view, ensure_ascii=False, indent=2))
     return 0
 

@@ -123,6 +123,14 @@ Parse the JSON output. Common response shapes:
 
 ---
 
+## Newegg Link Tagging (UTM)
+
+This skill is fully dynamic, so the response shape (and any product link or item
+number it contains) isn't fixed in advance. Whenever the tool response surfaces a
+Newegg product link or item number, tag it with UTM parameters before showing it to
+the user — same convention as `newegg-pc-builder-v2`, see
+[`references/product_link_rules.md`](./references/product_link_rules.md).
+
 ## Edge case handling
 
 | Situation | Action |

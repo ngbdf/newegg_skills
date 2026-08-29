@@ -26,6 +26,7 @@ Options:
     --limit N       max items to print (default 30; slim mode only)
     --raw           print the full upstream JSON instead of the slimmed view
     --timeout N     seconds (default 30)
+    --utm-source S  calling platform for Newegg link tagging (default "claude")
 
 Exit codes: 0 ok, 1 usage error, 2 transport/API error.
 """
@@ -40,6 +41,25 @@ ENDPOINT = "https://apis.newegg.com/ex-mcp/endpoint/product-search"
 TOOL = "newegg product search"
 # Identifies the calling skill to the endpoint; sent on every request.
 SKILL_NAME = "newegg-monitor-finder"
+
+# --- Newegg link tagging (UTM) --------------------------------------------
+# Same convention as newegg-pc-builder-v2's reference/product_link_rules.md.
+# utm_source is the calling platform, resolved by the agent per
+# environment_detection.md (Claude-exclusive tool present -> "claude", a
+# Cursor project signature -> "cursor", etc.; "unknown_agent" if undetermined)
+# and passed in via --utm-source -- never hardcode a guess.
+UTM_CAMPAIGN = "monitor-finder"
+UTM_CONTENT = "newegg-monitor-finder"
+
+
+def build_item_url(item_number, utm_source):
+    """Tagged Newegg product-page link for a single item number."""
+    return (
+        f"https://www.newegg.com/p/{item_number}?Item={item_number}"
+        f"&utm_source={utm_source}&utm_medium=ai_skill"
+        f"&utm_campaign={UTM_CAMPAIGN}&utm_content={UTM_CONTENT}"
+    )
+
 
 SPEC_RE = re.compile(r"<b>(.*?):</b>\s*([^<]*)")
 SIZE_RE = re.compile(r"([\d.]+)")
@@ -167,14 +187,14 @@ def is_curved(specs, haystack):
     return None
 
 
-def slim_product(product):
+def slim_product(product, utm_source="claude"):
     specs = parse_specs(product.get("ViewDescription"))
     price = product.get("Price") or {}
     number = product.get("ItemNumber")
     haystack = haystack_of(product, specs)
     out = {
         "ItemNumber": number,
-        "Url": f"https://www.newegg.com/p/{number}" if number else None,
+        "Url": build_item_url(number, utm_source) if number else None,
         "Title": product.get("WebDescription"),
         "FinalPrice": price.get("FinalPrice"),
         "PriceSaveText": price.get("PriceSaveText") or None,
@@ -190,7 +210,7 @@ def slim_product(product):
     return {k: v for k, v in out.items() if v is not None}
 
 
-def slim(data, limit):
+def slim(data, limit, utm_source="claude"):
     products = data.get("products") or []
     return {
         "total": data.get("total"),
@@ -198,7 +218,7 @@ def slim(data, limit):
         "pageSize": data.get("pageSize"),
         "totalPage": data.get("totalPage"),
         "shown": min(len(products), limit),
-        "products": [slim_product(p) for p in products[:limit]],
+        "products": [slim_product(p, utm_source) for p in products[:limit]],
     }
 
 
@@ -211,6 +231,7 @@ def main(argv):
     raw = False
     limit = 30
     timeout = 30
+    utm_source = "claude"
     arguments = {"order": 15, "page": 1}
 
     def value_after(token, index, cast):
@@ -238,6 +259,11 @@ def main(argv):
         elif token == "--timeout":
             index += 1
             timeout = value_after(token, index, int)
+        elif token == "--utm-source":
+            index += 1
+            if index >= len(argv):
+                die(f"{token} needs a value", 1)
+            utm_source = argv[index]
         elif token == "--raw":
             raw = True
         elif token.startswith("--"):
@@ -276,7 +302,7 @@ def main(argv):
         die(f"--min-price {low} is above --max-price {high}", 1)
 
     data = call(arguments, timeout)
-    view = data if raw else slim(data, limit)
+    view = data if raw else slim(data, limit, utm_source)
     print(json.dumps(view, ensure_ascii=False, indent=2))
     return 0
 

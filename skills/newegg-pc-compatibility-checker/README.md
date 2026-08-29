@@ -57,8 +57,9 @@ Flow:
   of a vague warning.
 - **Every item gets a Newegg link.** Checked parts and suggested replacements
   are both shown with their product page at
-  `https://www.newegg.com/p/<ItemNumber>`, so the user never has to search for
-  a part the skill already identified.
+  `https://www.newegg.com/p/<ItemNumber>`, UTM-tagged per
+  `references/product_link_rules.md` (same convention as `newegg-pc-builder-v2`),
+  so the user never has to search for a part the skill already identified.
 
 ## Benchmark
 

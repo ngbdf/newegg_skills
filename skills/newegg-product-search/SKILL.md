@@ -115,7 +115,7 @@ response → result.content[0].text → (parse as JSON) → PageProducts
 | `IsRefurbished`             | `true` if refurbished item                       |
 
 **URL construction:**
-- Product page: `https://www.newegg.com/p/{ItemNumber}`
+- Product page: `https://www.newegg.com/p/{ItemNumber}` — tag with UTM params before display, see [`references/product_link_rules.md`](./references/product_link_rules.md).
 - Product image: `https://c1.neweggimages.com/productimage/nb300/{ImageName}`
 
 ## Response Format
@@ -125,11 +125,11 @@ response → result.content[0].text → (parse as JSON) → PageProducts
 
 | # | Product | Price | Rating | Reviews |
 |---|---------|-------|--------|---------|
-| 1 | [WebDescription](https://www.newegg.com/p/{ItemNumber}) | CurrentPriceText | ⭐ RatingOneDecimal | HumanRating |
+| 1 | [WebDescription](https://www.newegg.com/p/{ItemNumber}?Item={ItemNumber}&utm_source={platform}&utm_medium=ai_skill&utm_campaign=product-search&utm_content=newegg-product-search) | CurrentPriceText | ⭐ RatingOneDecimal | HumanRating |
 | 2 | ... | ... | ... | ... |
 
 📄 Page {page} / {totalPage}  ·  {total} total results
-🔗 [View all on Newegg](https://www.newegg.com/p/pl?d={query})
+🔗 [View all on Newegg](https://www.newegg.com/p/pl?d={query}&utm_source={platform}&utm_medium=ai_skill&utm_campaign=product-search&utm_content=newegg-product-search)
 ```
 
 - If item is on sale, append savings below its row: `> 💸 Save PriceSaveText (was OriginalPriceText)`
