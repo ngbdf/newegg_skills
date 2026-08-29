@@ -41,15 +41,48 @@ product-search is only needed when the user gives you a model name without an it
 it resolves `name → ItemNumber`. When the user already gave item numbers, go straight to
 pc-builder.
 
+**Newegg product link format**: every item number resolves to a working product page at
+`https://www.newegg.com/p/<ItemNumber>` (short-hyphenated form, e.g.
+`https://www.newegg.com/p/19-113-884` — this redirects to the canonical product URL and always
+works). **Attach this link whenever you display an item in the response, as a markdown hyperlink
+on the item's name** — `[<name> (<item number>)](https://www.newegg.com/p/<item number>)` — for
+every checked part and every replacement part you propose. Never show the raw URL as its own
+table column or its own line next to the name; that's redundant.
+
+**Price**: product-search results include a `Price.FinalPrice` (numeric) and `Price.CurrencyCode`
+field on each product. Whenever you already have a product-search result for an item — which you
+will, either from resolving a model name or from the item-number verification step below — carry
+its price into the report as well. Show it in the price column next to the item, formatted with
+the currency (e.g. `$699.00`). Do not fetch a price you don't already have just to fill this in,
+and never invent or estimate one — if a given item's price genuinely isn't available (e.g. the
+user supplied an item number you deliberately did not re-verify — which shouldn't happen per the
+rule below), leave the price cell blank rather than guessing.
+
 ## The flow
 
 ### Step 1 — Get every part as an item number
 
 Look at what the user provided:
 
-* **They gave item numbers** (e.g. `19-113-938`) → use them directly and **skip straight to Step
-  2**. No lookup needed. Always use the **short hyphenated format** (`19-113-938`), never the
-  long URL form (`N82E16819113938`).
+* **They gave item numbers** (e.g. `19-113-938`) → **verify each one before trusting it**, then
+  go to Step 2. Always use the **short hyphenated format** (`19-113-938`), never the long URL
+  form (`N82E16819113938`).
+
+  **Why verify:** pc-builder does not validate that a submitted item number belongs to a real
+  catalog product. A typo'd or hallucinated item number is silently treated as "no data" and
+  the combo comes back `isCompatible: true` with no error and no `incompatibleItems` — visually
+  identical to a genuine compatible verdict. Do not skip this just because it looks like a
+  legitimate ID.
+
+  **How to verify:** call **product-search** with the item number itself as the `query`. This
+  endpoint is a general keyword search, not an exact-ID lookup, so it returns loosely-matching
+  results even for numbers that don't exist — the check is whether any returned product's
+  `ItemNumber` field is an **exact match** for the number you searched, not whether the search
+  returned results at all.
+  * Exact match found → confirmed real, proceed. You now also have the product name and can use
+    it for the Newegg link / display name.
+  * No exact match → treat it exactly like a `product-search: total 0` case (see below): tell the
+    user this item number wasn't found in the catalog and confirm before proceeding with anything.
 * **They gave model names** (e.g. "Ryzen 9 9950X3D" + "ASUS B760M-AYW WIFI D4") → call
   **product-search** once per part (in parallel) to resolve each name into an `ItemNumber`.
 * **Mixed** → only search for the parts that do not already have item numbers.
@@ -136,33 +169,47 @@ Fields on the verdict object:
 
 ### Step 3 — Report the verdict honestly
 
-**If `isCompatible: true`:** Say so plainly, list what was checked, and stop. Do not invent
-caveats from your own knowledge.
+**If `isCompatible: true`:** Say so plainly, list what was checked — each item with its Newegg
+link (`https://www.newegg.com/p/<ItemNumber>`) — and stop. Do not invent caveats from your own
+knowledge beyond the PSU exception below.
 
 **Exception — PSU wattage disclosure.** pc-builder's rules cover sockets, chipsets, memory type,
 physical fit, and electrical interfaces — but they **do not validate that a PSU's wattage meets
 the GPU manufacturer's recommended minimum**. So a 750W PSU paired with an RTX 5090 will return
 `isCompatible: true` even though Nvidia recommends 1000W.
 
-Whenever a PSU is among the checked items AND `isCompatible: true`, append one neutral line to
-the report:
+Whenever a PSU is among the checked items AND `isCompatible: true`, do not just print a generic
+warning — try to get an actual number first:
 
-> ⚠️ pc-builder does not verify PSU recommended wattage against the GPU's requirements. Please
-> cross-check your PSU against your GPU manufacturer's official wattage recommendation before
-> assembling.
+1. **Check whether the `newegg-psu-calculator` skill is installed/available in this session.**
+2. **If it is available**, invoke it with the CPU/GPU/RAM/storage from this build (as much as you
+   know) to get a real `recommended_psu_watts` figure, then compare it against the PSU actually in
+   the build:
+   * PSU wattage ≥ recommended → state plainly that the PSU is sufficient, citing both numbers.
+   * PSU wattage < recommended → flag it clearly as undersized, show both numbers side by side,
+     and propose a specific replacement PSU (Step 4) at or above the recommended tier, with its
+     Newegg link.
+3. **If `newegg-psu-calculator` is not available**, do not attempt the wattage math yourself —
+   append this line instead:
+
+   > ⚠️ pc-builder does not verify PSU recommended wattage against the GPU's requirements, and the
+   > `newegg-psu-calculator` skill isn't available in this session to calculate it precisely.
+   > Install that skill for an exact recommendation, or check it yourself with Newegg's official
+   > calculator: https://www.newegg.com/tools/power-supply-calculator
 
 This is not "adding a caveat from your own knowledge" — it is a known, documented limitation of
-the MCP, and the user needs to know the compatibility engine's scope.
+the MCP. Prefer a precise, skill-calculated answer when `newegg-psu-calculator` is available; fall
+back to pointing the user at the official tool only when it isn't.
 
 **If `isCompatible: false`:** Walk through `incompatibleItems[]` one entry at a time. For each
 entry:
 
 1. Refer to the two conflicting items using **whatever the user gave you in their original
-   question**:
+   question**, each with its Newegg link:
    * User gave model names → use those names (e.g. "Ryzen 9 9950X3D ↔ ASUS B760M-AYW").
    * User gave bare item numbers → use the item numbers (e.g. "19-113-938 ↔ 13-144-674").
    * User gave a mix → use names where they gave names, item numbers where they gave item
-     numbers. Do not do a lookup just to pretty-print.
+     numbers. Do not do a lookup just to pretty-print — only fetch the link, not a renamed label.
 2. List **every** entry in `reasonTraces` — not just `reason`. Each trace is a separate failed
    rule and the user deserves to see all of them.
 3. Translate each `reasonTrace` into the user's language (per the top-level "Reply in the user's
@@ -175,30 +222,44 @@ entry:
 
 After explaining the conflict, propose a concrete fix:
 
-* Socket / chipset / DDR-generation mismatch → swap the smaller/cheaper side (usually the
-  motherboard or RAM, not the CPU).
-* PSU undersized vs GPU → suggest a specific replacement PSU.
-* Physical fit (case clearance, cooler height) → swap a part of the same category.
+| Conflict type | Typical fix |
+| --- | --- |
+| Socket / chipset / DDR-generation mismatch | Swap the smaller/cheaper side (usually the motherboard or RAM, not the CPU) |
+| PSU undersized vs. GPU (see PSU wattage disclosure above) | Suggest a specific replacement PSU at/above the calculated recommended wattage |
+| Physical fit (case clearance, cooler height) | Swap a part of the same category |
 
 Use **product-search** to find the replacement part, then **call pc-builder again** with the
 updated item list to verify. Do not declare the fix valid from your own reasoning — re-run
 pc-builder. Iterate until `isCompatible: true` or the user changes scope.
 
+**Every replacement part you propose must include its Newegg product link**
+(`https://www.newegg.com/p/<ItemNumber>`) so the user can go buy it directly — a fix suggestion
+with no link makes the user do a manual search for something you already found.
+
 ## Response format
 
-Use this structure when reporting the verdict to the user:
+Use this structure when reporting the verdict to the user. **The Newegg link is never its own
+column or its own line — it's a markdown hyperlink on the item's name itself**
+(`[<name> (<item number>)](https://www.newegg.com/p/<item number>)`), so the table stays compact
+and the link is still one click away. All headings, labels, and explanations in the template below
+must be translated into the user's language; the English shown here is a structural placeholder —
+do not ship English section headers (`## Compatibility check`, `### Suggested fix`, etc.) to a
+non-English-speaking user.
 
 **Compatible:**
 
 ```
 ## Compatibility check: ✅ Compatible
 
-Checked:
-- <user's name for item 1> (<item number>)
-- <user's name for item 2> (<item number>)
-- ...
+| Part | Model / Item # | Price |
+| --- | --- | --- |
+| <category> | [<user's name for item 1> (<item number>)](https://www.newegg.com/p/<item number>) | $<price> |
+| <category> | [<user's name for item 2> (<item number>)](https://www.newegg.com/p/<item number>) | $<price> |
 
 All parts are compatible according to Newegg PC Compatibility Checker.
+
+[If a PSU is included: PSU wattage line per the Exception rule above — either a
+newegg-psu-calculator-backed verdict with both wattages, or the official calculator link.]
 ```
 
 **Incompatible:**
@@ -206,31 +267,41 @@ All parts are compatible according to Newegg PC Compatibility Checker.
 ```
 ## Compatibility check: ❌ Incompatible
 
-**Conflict 1: <name1> ↔ <name2>**
-- <reasonTraces[0]>
-- <reasonTraces[1]>
-- ...
+**Conflict 1: [<name1> (<item1>)](https://www.newegg.com/p/<item1>) ↔ [<name2> (<item2>)](https://www.newegg.com/p/<item2>)**
+- <reasonTraces[0] translated> (original: <reasonTraces[0]>)
+- <reasonTraces[1] translated> (original: <reasonTraces[1]>)
 
 **Conflict 2: ...**
 
 ### Suggested fix
-<specific replacement part with item number>
+| Conflict | Replacement | Price |
+| --- | --- | --- |
+| Conflict 1 | [<specific replacement part name> (<item number>)](https://www.newegg.com/p/<item number>) | $<price> |
 
 ### Re-verification
-[call pc-builder again → report new isCompatible]
+[call pc-builder again with the replacement → report new isCompatible]
 ```
-
-All headings, labels, and explanations in the response template above must be translated into
-the user's language. The English text shown in the template is a structural placeholder — do not
-ship English section headers (`## Compatibility check`, `### Suggested fix`, etc.) to a
-non-English-speaking user.
 
 ## Hard rules
 
+* **Attach a Newegg product link to every item you display, as a hyperlink on its name** —
+  `[<name> (<item number>)](https://www.newegg.com/p/<ItemNumber>)` (short-hyphenated form) —
+  whether it's a part the user asked about or a replacement you're suggesting. Never put the raw
+  URL in its own table column or its own line; that's redundant next to a named hyperlink.
+* **Show each item's price** (from `Price.FinalPrice` / `Price.CurrencyCode` on the product-search
+  result you already fetched for the link/verification step) in its own table column. Never
+  invent or estimate a price — leave the cell blank if you genuinely don't have one.
+* **Prefer `newegg-psu-calculator` for the PSU wattage exception.** Check whether it's available
+  and call it for an exact recommended wattage before falling back to the generic disclaimer /
+  official calculator link.
 * **Item numbers go to pc-builder in short hyphenated format** (`19-113-938`), not the long form
   (`N82E16819113938`).
 * **Never claim compatibility without an `isCompatible: true`** from pc-builder. No verdicts
   derived from your own knowledge. Ever.
+* **Never trust `isCompatible: true` for an item number that wasn't verified to exist** (either
+  resolved via product-search from a model name, or exact-matched via product-search when the
+  user gave the number directly). pc-builder returns `isCompatible: true` for nonexistent item
+  numbers with no error — that is not a real verdict.
 * **Never claim incompatibility without an `isCompatible: false`** from pc-builder. Even for
   "obvious" cases (AMD CPU + Intel motherboard), still call pc-builder so the user sees the
   authoritative verdict and the specific reasons.
@@ -263,9 +334,17 @@ non-English-speaking user.
 * **Silently substituting a part when product-search returns 0 results.** If Newegg does not have
   the exact part the user asked about, you must tell the user and ask — not quietly proceed with
   a similar part. The final verdict must always be about the parts the user actually asked about.
-* **Omitting the PSU wattage disclaimer** when reporting an `isCompatible: true` build that
+* **Omitting the PSU wattage disclosure** when reporting an `isCompatible: true` build that
   includes a PSU. pc-builder does not check that the PSU is big enough for the GPU; tell the user
   that explicitly instead of letting them assume the green check covers it.
+* **Reaching straight for the generic PSU disclaimer text when `newegg-psu-calculator` is actually
+  available.** Call it first — a precise "you need ~750W, you have 650W" beats a vague warning.
+* **Presenting a checked or replacement item without its Newegg link.** The user should never have
+  to go search for a part you already identified by item number.
+* **Putting the link in its own column/line instead of hyperlinking the item name.** A redundant
+  raw URL next to the name it belongs to is noise — link the name itself.
+* **Making up a price, or reusing a stale one, instead of the `Price.FinalPrice` from the
+  product-search call you already made for that item.**
 
 ## Edge cases
 
@@ -276,3 +355,6 @@ non-English-speaking user.
   user the service returned an inconsistent response and ask them to retry.
 * **`incompatibleItems` pairs the same `itemNumber` with multiple `relatedItemNumber`s**: Report
   each pair separately; do not collapse them.
+* **A user-supplied item number does not exactly match any product-search result**: treat as not
+  found — same handling as a zero-result name search. Do not call pc-builder with an unverified
+  item number and do not report whatever `isCompatible` it returns as trustworthy.

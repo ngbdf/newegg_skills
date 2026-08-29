@@ -24,7 +24,7 @@ endpoints over HTTP/JSON-RPC — no MCP client registration required:
 
 | Endpoint                                                    | Purpose                                     |
 | ----------------------------------------------------------- | ------------------------------------------- |
-| `https://apis-e111.newegg.org/mcp/endpoint/pc-builder`      | Compatibility check (`comboCompatibleAll`)  |
+| `https://apis.newegg.com/ex-mcp/endpoint/ext-pc-builder`    | Compatibility check (`comboCompatibleAll`)  |
 | `https://apis.newegg.com/ex-mcp/endpoint/product-search`    | Resolve model names → Newegg item numbers  |
 
 Flow:
@@ -47,11 +47,18 @@ Flow:
   reference.
 - **Do not silently substitute parts.** If product-search returns zero results
   for a part, tell the user and ask — do not proceed with a similar part.
-- **Disclose the PSU wattage limitation.** pc-builder checks sockets,
-  chipsets, memory generations, and physical fit — but it does not validate
-  that a PSU's wattage meets the GPU manufacturer's recommended minimum. When
-  a PSU is among the compatible items, the skill tells the user to cross-check
-  wattage themselves.
+- **Disclose the PSU wattage limitation — precisely when possible.** pc-builder
+  checks sockets, chipsets, memory generations, and physical fit — but it does
+  not validate that a PSU's wattage meets the GPU manufacturer's recommended
+  minimum. When a PSU is among the compatible items, the skill first tries the
+  `newegg-psu-calculator` skill (if installed) for an exact recommended
+  wattage; if that skill isn't available, it points the user to Newegg's own
+  calculator at https://www.newegg.com/tools/power-supply-calculator instead
+  of a vague warning.
+- **Every item gets a Newegg link.** Checked parts and suggested replacements
+  are both shown with their product page at
+  `https://www.newegg.com/p/<ItemNumber>`, so the user never has to search for
+  a part the skill already identified.
 
 ## Benchmark
 

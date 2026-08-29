@@ -8,12 +8,22 @@ description: >-
   or describe PC components (CPU + GPU + RAM + storage) and want to know what
   power supply to buy. Trigger even if the user hasn't explicitly mentioned PSU —
   wattage is the natural next question once someone lists their components.
+allowed-tools: bash
 ---
 
 # Newegg PSU Wattage Calculator
 
 Intelligently collects component information through **adaptive menus**, then
 calculates total wattage via live Newegg CPU/GPU wattage tables + fixed tables.
+
+**Always run `scripts/calculate_psu.py` for the calculation — never calculate wattage
+yourself from the fallback tables at the bottom of this file "as a shortcut."** Those tables
+exist ONLY for the rare case the script genuinely cannot run (e.g. no bash/python available in
+this environment). If you do fall back to manual math, you MUST still follow the same
+"don't guess, say so" rule the script follows (see the box at the end of the fallback section) —
+mapping an unrecognized string like "魔改ITX定制版" to the nearest-sounding table entry
+("Mini-ITX" just because it contains "ITX") is exactly the bug the script was fixed to avoid, and
+doing it by hand reproduces the same wrong result with none of the script's warnings.
 
 `scripts/calculate_psu.py` fetches the CPU and GPU wattage tables from the
 `website-www-tool` endpoint (`apis.newegg.com/ex-mcp/...`, stateless JSON-RPC, no auth)
@@ -255,13 +265,49 @@ Script JSON fields (use these; do not invent numbers):
 | `recommended_psu_watts` | **Sole main recommendation** (catalog tier) |
 | `catalog_floor_applied` | `true` when headroom &lt; 550 but rec is 550 |
 | `optional_higher_tier_watts` | Next tier above main (for verbal mention / later link only) |
-| `recommendation_note` | Wording guidance — follow it |
-| `shop_url` | First (and only) link in the first reply; wattage == main rec |
+| `recommendation_note` | Wording guidance — follow it. Now also carries a live-data caveat (wattages come from a live table and can shift slightly between queries) — relay that in your own words once, don't ignore it. |
+| `shop_url` | Newegg "product list" (category-search) link at the same wattage — the same URL that was previously shown alone as the fallback. **Always show this too**, not only when `recommended_products` is empty — see the table format below. |
+| `recommended_products` | 0–5 real 80+ Gold-or-better PSUs at the recommended tier, each with `name`, `price`, `currency`, `link` (`newegg.com/p/<item#>`, UTM-tagged). Render as a numbered Markdown table — see "Recommended-products table format" below — never as inline bullets. |
+| `warnings[]` | Any component the script couldn't confidently identify (unrecognized motherboard/RAM/SSD/HDD/optical string, a non-numeric count, etc.) — see below. |
+
+**Always surface `warnings[]` to the user when non-empty**, even briefly. A component the script
+couldn't identify still affects the total (RAM: excluded entirely; SSD/HDD/optical: assumed a
+stated default; motherboard: assumed ATX or SSI CEB with a note). Silently dropping the warning
+defeats the point of the script producing one — the user should know a wattage might be
+under/over-stated for a part it couldn't confidently parse, ideally with a quick follow-up
+question to confirm what they actually meant.
+
+### Recommended-products table format
+
+Same numbered-table convention as `newegg-pc-builder-v2`'s component table and
+`newegg-gaming-pc-finder`'s results table — a plain "name — $price" bullet list is not enough
+once there can be up to 5 rows. When `recommended_products` is non-empty, render **up to the
+first 5** as:
+
+```markdown
+| # | Power Supply | Price |
+|---|---|---|
+| 1 | [Thermaltake Toughpower GT 850W 80 Plus Gold ATX 3.1](https://www.newegg.com/p/1HU-0014-006W8?Item=1HU-0014-006W8&utm_source=claude&utm_medium=ai_skill&utm_campaign=psu-calculator&utm_content=newegg-psu-calculator) | $79.99 |
+| 2 | [Cooler Master MWE V4 850W 80 PLUS Gold Fully Modular](https://www.newegg.com/p/17-171-248?Item=17-171-248&utm_source=claude&utm_medium=ai_skill&utm_campaign=psu-calculator&utm_content=newegg-psu-calculator) | $139.99 |
+| 3 | [Thermaltake Toughpower GF3 850W 80 Plus Gold](https://www.newegg.com/p/17-153-438?Item=17-153-438&utm_source=claude&utm_medium=ai_skill&utm_campaign=psu-calculator&utm_content=newegg-psu-calculator) | $121.99 |
+| 4 | [Thermaltake Toughpower GT 850W Snow 80 Plus Gold](https://www.newegg.com/p/17-153-473?Item=17-153-473&utm_source=claude&utm_medium=ai_skill&utm_campaign=psu-calculator&utm_content=newegg-psu-calculator) | $99.99 |
+| 5 | [darkFlash DG850 850W 80 PLUS Gold Fully Modular](https://www.newegg.com/p/17-950-002?Item=17-950-002&utm_source=claude&utm_medium=ai_skill&utm_campaign=psu-calculator&utm_content=newegg-psu-calculator) | $74.99 |
+
+More options: [Browse all {recommended_psu_watts}W Gold+ power supplies]({shop_url})
+```
+
+Rules:
+- Row order = the order `recommended_products` came back in (already Best-Selling-ranked); never re-sort by price.
+- `#` is a plain 1-5 rank, not the item number.
+- Product name is the full `name` field turned into a Markdown hyperlink on `link` — never truncate or paraphrase it, and never drop the `$` + `price` column.
+- Fewer than 5 entries → render only that many rows, still as a table (never pad with fake rows).
+- `recommended_products` empty → skip the table entirely and use `shop_url` alone: "See Newegg's {recommended_psu_watts}W Gold+ power supplies: [link](shop_url)".
+- **The `shop_url` "More options" line always appears**, table or no table — it's the same product-list page previously shown as the lone fallback link; the table doesn't replace it, it supplements it.
 
 ### Hard rules — ticket #14 (main rec / wording / link must align)
 
 1. **Main recommendation** = `recommended_psu_watts` only. Never treat a higher tier as the primary pick.
-2. **First shop link** = `shop_url` (or build URL with the **same** wattage). Forbidden: main says 550W but link is `d=650W`, or main says 750W while copy pushes 650W as the buy target.
+2. **First shop link** = `shop_url` (or build URL with the **same** wattage) — this is the same product-list link shown as the "More options" line even when the `recommended_products` table is also shown. Forbidden: main says 550W but link is `d=650W`, or main says 750W while copy pushes 650W as the buy target.
 3. You may **verbally** mention `optional_higher_tier_watts` for upgrade headroom (one short sentence). That mention is **not** a second recommendation and must not get a link yet.
 4. **End of first reply:** ask if they want a higher-wattage shop link. Give a second link **only after** the user agrees.
 5. Do **not** dump multiple conflicting wattages + multiple links in the first reply.
@@ -285,13 +331,29 @@ Script JSON fields (use these; do not invent numbers):
 4. **PSU tiers** (must match `PSU_TIERS` in `calculate_psu.py`): 550 · 650 · 750 · 850 · 1000 · 1200 · 1600  
    - Guidance: 550–750 Gold modular OK; 850+ prefer Gold minimum; 1000+ Platinum when budget allows.
 5. **PCIe connector note** — for RTX 5000 series: must have PCIe 5.0 16-pin (600W native)
-6. **First Newegg shop link** — `shop_url` (wattage == main recommendation)
+6. **Newegg product table + product-list link** — per "Recommended-products table format" above:
+   the top-5 `recommended_products` table (when non-empty) plus the `shop_url` "More options" link
+   always shown together; `shop_url` alone (no table) when `recommended_products` is empty. Either
+   way, wattage must equal the main recommendation.
 7. Optional one-line higher-tier mention + **ask** before any second link
 8. **Existing PSU comparison:** only if the user clearly stated an existing PSU **in this turn**. Never invent “you already have a 750W PSU.”
 
 ---
 
-## Fallback wattage tables (for manual calculation if script unavailable)
+## Fallback wattage tables (for manual calculation ONLY IF the script genuinely cannot run)
+
+**This is a last resort, not a shortcut.** Try `scripts/calculate_psu.py` first, always. Only use
+these tables when bash/python is completely unavailable in this environment.
+
+> **Hard rule if you must use these tables manually:** match a component string to one of the
+> categories below ONLY when it clearly and unambiguously names that category (e.g. the user
+> literally typed "Mini-ITX", or "ATX"). If the string doesn't clearly match anything here —
+> garbled text, a custom/modified board name, a phrase you don't recognize, anything you'd have
+> to guess at — do NOT pick the nearest-sounding or nearest-substring entry. Instead: say plainly
+> that you couldn't identify that component, assume **ATX (70W)** for motherboard (or **SSI CEB
+> 150W** if the CPU is Threadripper/HEDT) as a stated fallback, and tell the user which part you
+> couldn't confidently place. This mirrors exactly what `calculate_psu.py`'s `warnings[]` does —
+> manual mode must not silently do worse than the script.
 
 ### Motherboard
 ATX 70W · E-ATX 100W · Micro ATX 60W · Mini-ITX 30W · Thin Mini-ITX 20W · SSI CEB/EEB 150W · XL AT 130W
